@@ -5,6 +5,45 @@ def authenticate_with_approle(vault_url, role_id, secret_id):
     client = hvac.Client(url=vault_url)
 
     # AppRole authentication
+    response = client.auth_approle(role_id=role_id, secret_id=secret_id)
+
+    if response and response.get('auth') and response['auth'].get('client_token'):
+        # Set the client token for subsequent requests
+        client.token = response['auth']['client_token']
+        print("Authentication successful!")
+    else:
+        print("Authentication failed.")
+
+    return client
+
+# Replace these values with your Vault server URL, AppRole role ID, and AppRole secret ID
+vault_url = 'https://your-vault-url.com'
+role_id = 'your-role-id'
+secret_id = 'your-secret-id'
+
+vault_client = authenticate_with_approle(vault_url, role_id, secret_id)
+
+# Now you can use the authenticated client to interact with Vault
+# For example, reading a secret
+secret_path = 'secret/myapp/config'
+secret_data = vault_client.read(secret_path)
+
+if secret_data and secret_data.get('data'):
+    actual_secret = secret_data['data']
+    print(f"Secret data: {actual_secret}")
+else:
+    print("Failed to retrieve secret.")
+
+
+/*
+
+import hvac
+
+def authenticate_with_approle(vault_url, role_id, secret_id):
+    # Create a Vault client
+    client = hvac.Client(url=vault_url)
+
+    # AppRole authentication
     response = client.auth_approle(role_id, secret_id)
 
     if response and response.get('auth') and response['auth'].get('client_token'):
