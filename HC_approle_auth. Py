@@ -1,3 +1,28 @@
+import subprocess
+import json
+
+# HashiCorp Vault API endpoint and secret path
+vault_url = "https://your-vault-url/v1/secret/path"
+headers = {"X-Vault-Token": "your-vault-token"}
+
+# cURL command to retrieve secret
+curl_command = [
+    "curl",
+    "--header", f"X-Vault-Token: {headers['X-Vault-Token']}",
+    vault_url
+]
+
+# Execute cURL command using subprocess
+try:
+    result = subprocess.run(curl_command, capture_output=True, text=True)
+    secret_data = json.loads(result.stdout)
+
+    # Process the secret_data as needed
+    # ...
+
+except subprocess.CalledProcessError as e:
+    print(f"Error executing cURL command: {e}")
+
 import hvac
 
 def authenticate_with_approle(vault_url, role_id, secret_id):
