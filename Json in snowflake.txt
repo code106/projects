@@ -1,0 +1,86 @@
+Sure! Let's start by creating a sample JSON data and then I'll provide you with a sample SQL query to flatten and read the data in Snowflake.
+
+### Sample JSON Data
+
+Consider the following JSON data representing customer orders:
+
+```json
+{
+  "orders": [
+    {
+      "order_id": 1,
+      "customer": {
+        "customer_id": 101,
+        "name": "John Doe"
+      },
+      "items": [
+        {
+          "item_id": 1001,
+          "product_name": "Laptop",
+          "quantity": 1,
+          "price": 1200
+        },
+        {
+          "item_id": 1002,
+          "product_name": "Mouse",
+          "quantity": 2,
+          "price": 25
+        }
+      ]
+    },
+    {
+      "order_id": 2,
+      "customer": {
+        "customer_id": 102,
+        "name": "Jane Smith"
+      },
+      "items": [
+        {
+          "item_id": 1003,
+          "product_name": "Keyboard",
+          "quantity": 1,
+          "price": 75
+        }
+      ]
+    }
+  ]
+}
+```
+
+### Flattening JSON Data in Snowflake SQL
+
+Assuming you have a table named `orders_json` with a column `json_data` that stores the above JSON data, you can use Snowflake's `FLATTEN` function to read and flatten the JSON data.
+
+Here's a sample SQL query to flatten the JSON data:
+
+```sql
+-- Flatten the JSON data
+SELECT
+  order.value:order_id::int AS order_id,
+  order.value:customer.customer_id::int AS customer_id,
+  order.value:customer.name::string AS customer_name,
+  item.value:item_id::int AS item_id,
+  item.value:product_name::string AS product_name,
+  item.value:quantity::int AS quantity,
+  item.value:price::float AS price
+FROM
+  orders_json,
+  LATERAL FLATTEN(input => parse_json(json_data):orders) order,
+  LATERAL FLATTEN(input => order.value:items) item;
+```
+
+### Explanation
+
+1. **`LATERAL FLATTEN`**: The `FLATTEN` function is used to convert the nested JSON arrays into a relational table format. We use it twice:
+   - First, to flatten the `orders` array.
+   - Second, to flatten the `items` array within each order.
+
+2. **`parse_json(json_data)`**: This function parses the JSON string stored in the `json_data` column.
+
+3. **Column Selection**: We select and cast the necessary attributes from the flattened JSON data to appropriate data types (e.g., `order_id::int`).
+
+### Result
+
+The result of the above query will be a flattened table with the following columns: `order_id`, `customer_id`, `customer_name`, `item_id`, `product_name`, `quantity`, and `price`.
+
+I hope this helps! Let me know if you need any further assistance.
