@@ -1,0 +1,80 @@
+
+Extract data from REST API
+Load the data into a file
+Copy the file to an S3 bucket
+Load the data from S3 to Snowflake
+
+Step 1: Extract Data from REST API
+First, let's use the requests library to fetch data from a REST API.
+
+Python
+import requests
+import json
+
+# Replace with your API endpoint
+api_url = 'https://api.example.com/data'
+response = requests.get(api_url)
+
+if response.status_code == 200:
+    data = response.json()
+else:
+    raise Exception(f"API request failed with status code {response.status_code}")
+
+# Save data to a file
+with open('data.json', 'w') as file:
+    json.dump(data, file)
+
+
+Step 2: Copy the File to an S3 Bucket
+We'll use the boto3 library to upload the JSON file to an S3 bucket.
+
+Python
+import boto3
+
+# Replace with your AWS credentials and bucket details
+s3_client = boto3.client('s3', 
+                         aws_access_key_id='YOUR_ACCESS_KEY',
+                         aws_secret_access_key='YOUR_SECRET_KEY')
+
+bucket_name = 'your-bucket-name'
+file_name = 'data.json'
+s3_key = 'path/to/upload/data.json'
+
+s3_client.upload_file(file_name, bucket_name, s3_key)
+
+Step 3: Load the Data from S3 to Snowflake
+We'll use the snowflake-connector-python library to connect to Snowflake and load the data from the S3 bucket.
+
+Python
+import snowflake.connector
+
+# Replace with your Snowflake credentials and details
+conn = snowflake.connector.connect(
+    user='YOUR_SNOWFLAKE_USER',
+    password='YOUR_SNOWFLAKE_PASSWORD',
+    account='YOUR_SNOWFLAKE_ACCOUNT'
+)
+
+# Create a cursor object
+cur = conn.cursor()
+
+# Replace with your Snowflake stage and table details
+s3_stage = '@your_s3_stage'
+snowflake_table = 'your_table_name'
+
+# Copy data from S3 to Snowflake
+cur.execute(f"""
+    COPY INTO {snowflake_table}
+    FROM {s3_stage}/path/to/upload/data.json
+    FILE_FORMAT = (TYPE = 'JSON')
+""")
+
+# Close the cursor and connection
+cur.close()
+conn.close()
+
+Summary
+Extract data from the REST API: We fetched data from a REST API and saved it to a file.
+Copy the file to an S3 bucket: We uploaded the file to an S3 bucket using boto3.
+Load the data from S3 to Snowflake: We loaded the data from the S3 bucket to a Snowflake table using snowflake-connector-python.
+Make sure to replace placeholders with your actual API endpoint, AWS credentials, S3 bucket details, and Snowflake credentials.
