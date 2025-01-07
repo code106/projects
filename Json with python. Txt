@@ -1,0 +1,106 @@
+-- Create the table to store raw JSON data
+CREATE OR REPLACE TABLE raw_json_data (
+    id INT,
+    json_data STRING
+);
+
+-- Insert sample nested JSON data into the table
+INSERT INTO raw_json_data (id, json_data) VALUES
+(1, '{"name": "John", "age": 30, "address": {"street": "123 Main St", "city": "New York", "zipcode": {"prefix": "NY", "number": "10001"}}, "phones": [{"type": "home", "number": "212-555-1234"}, {"type": "work", "number": "646-555-5678"}]}'),
+(2, '{"name": "Jane", "age": 28, "address": {"street": "456 Elm St", "city": "San Francisco", "zipcode": {"prefix": "CA", "number": "94105"}}, "phones": [{"type": "home", "number": "415-555-7890"}, {"type": "work", "number": "650-555-1234"}]}');
+
+import json
+import pandas as pd
+import snowflake.connector
+
+def flatten_json(json_obj, parent_key='', sep='_'):
+    """
+    Recursively flattens a nested JSON object.
+    Args:
+        json_obj (dict): The JSON object to flatten.
+        parent_key (str): The base key string for the current level of recursion.
+        sep (str): The separator to use between keys.
+    Returns:
+        dict: A flattened dictionary where keys represent the path to each value.
+    """
+    items = {}
+    for key, value in json_obj.items():
+        new_key = f"{parent_key}{sep}{key}" if parent_key else key
+        if isinstance(value, dict):
+            items.update(flatten_json(value, new_key, sep=sep))
+        elif isinstance(value, list):
+            for i, item in enumerate(value):
+                items.update(flatten_json({f"{new_key}{sep}{i}": item}, '', sep=sep))
+        else:
+            items[new_key] = value
+    return items
+
+def parse_json(json_str):
+    """
+    Parses and flattens a JSON string.
+    Args:
+        json_str (str): The JSON string to parse.
+    Returns:
+        dict: A flattened dictionary.
+    """
+    json_obj = json.loads(json_str)
+    return flatten_json(json_obj)
+
+def insert_into_snowflake(flattened_data, table_name, connection_params):
+    """
+    Inserts flattened JSON data into a Snowflake table.
+    Args:
+        flattened_data (list): A list of flattened dictionaries.
+        table_name (str): The name of the Snowflake table to insert into.
+        connection_params (dict): The connection parameters for Snowflake.
+    """
+    # Convert the list of dictionaries to a DataFrame
+    df = pd.DataFrame(flattened_data)
+
+    # Establish a connection to Snowflake
+    conn = snowflake.connector.connect(**connection_params)
+
+    # Create a cursor object
+    cursor = conn.cursor()
+
+    # Create the table if it doesn't exist
+    create_table_sql = f"CREATE OR REPLACE TABLE {table_name} ({', '.join([f'{col} STRING' for col in df.columns])})"
+    cursor.execute(create_table_sql)
+
+    # Insert data into the table
+    insert_sql = f"INSERT INTO {table_name} ({', '.join(df.columns)}) VALUES ({', '.join(['%s' for _ in df.columns])})"
+    cursor.executemany(insert_sql, df.values.tolist())
+
+    # Close the cursor and connection
+    cursor.close()
+    conn.close()
+
+# Example usage
+if __name__ == "__main__":
+    # Define Snowflake connection parameters
+    connection_params = {
+        'user': 'your_user',
+        'password': 'your_password',
+        'account': 'your_account',
+        'warehouse': 'your_warehouse',
+        'database': 'your_database',
+        'schema': 'your_schema'
+    }
+
+    # Establish a connection to Snowflake
+    conn = snowflake.connector.connect(**connection_params)
+
+    # Read JSON data from the Snowflake table
+    cursor = conn.cursor()
+    cursor.execute("SELECT json_data FROM raw_json_data")
+    rows = cursor.fetchall()
+
+    # Parse and flatten the JSON data
+    flattened_data = [parse_json(row[0]) for row in rows]
+
+    # Insert the flattened data into a new Snowflake table
+    insert_into_snowflake(flattened_data, 'flattened_json_data', connection_params)
+
+    # Close the cursor and connection
+    cursor.close()
+    conn.close()
