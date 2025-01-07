@@ -1,0 +1,48 @@
+from snowflake.snowpark import Session
+from snowflake.snowpark.functions import col, parse_json, object_keys, get
+
+def parse_json_recursively(df, column_name, prefix=""):
+    # Get the keys of the JSON object
+    keys_df = df.select(object_keys(col(column_name)).alias("keys"))
+    keys = [row["keys"] for row in keys_df.collect()]
+
+    structured_df = df
+
+    for key in keys:
+        new_col_name = f"{prefix}{key}"
+
+        # Check if the value is a nested JSON object
+        nested_check_df = df.select(parse_json(col(f"{column_name}:{key}")).alias(new_col_name))
+        nested_check = nested_check_df.collect()[0][new_col_name]
+
+        if isinstance(nested_check, dict):
+            # If it's a nested JSON, recursively parse it
+            structured_df = structured_df.with_column(new_col_name, col(f"{column_name}:{key}").cast("VARIANT"))
+            structured_df = parse_json_recursively(structured_df, new_col_name, f"{new_col_name}_")
+        else:
+            # Otherwise, select the column as is
+            structured_df = structured_df.with_column(new_col_name, col(f"{column_name}:{key}"))
+
+    return structured_df
+
+def main(session: Session):
+    # Define the table name
+    tableName = "schema.table"
+
+    # Create a DataFrame from the table
+    df = session.table(tableName)
+
+    # Parse the JSON data from the column "UNI COURT_RAW_INP"
+    parsed_df = df.select(
+        parse_json(col("column")).alias("json_data")
+    )
+
+    # Recursively parse and flatten the JSON data
+    structured_df = parse_json_recursively(parsed_df, "json_data")
+
+    # Show the structured DataFrame
+    structured_df.show()
+
+# If you need to create a session, you can do it like this:
+# session = Session.builder.configs(...).create()
+# main(session)
