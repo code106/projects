@@ -1,3 +1,74 @@
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.io.OutputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.nio.charset.StandardCharsets;
+import java.util.Base64;
+import java.util.Map;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+
+public class TokenFetcher {
+    public static void main(String[] args) {
+        // Replace these with your actual details from the screenshot
+        String tokenUrl     = "https://travelers.okta.com/oauth2/aus1nw6a7oh7/v1/token";
+        String clientId     = "YOUR_CLIENT_ID";
+        String clientSecret = "YOUR_CLIENT_SECRET";
+
+        try {
+            // Prepare Basic Authentication header
+            String auth = clientId + ":" + clientSecret;
+            String encodedAuth = Base64.getEncoder().encodeToString(auth.getBytes(StandardCharsets.UTF_8));
+
+            // Open connection to the token URL
+            URL url = new URL(tokenUrl);
+            HttpURLConnection con = (HttpURLConnection) url.openConnection();
+            con.setRequestMethod("POST");
+            con.setDoOutput(true);
+            con.setRequestProperty("Content-Type", "application/x-www-form-urlencoded");
+            con.setRequestProperty("Authorization", "Basic " + encodedAuth);
+
+            // Request body using the client_credentials grant type.
+            // Adjust "scope" if required.
+            String requestBody = "grant_type=client_credentials&scope=api_aggregator";
+            try (OutputStream os = con.getOutputStream()) {
+                byte[] input = requestBody.getBytes(StandardCharsets.UTF_8);
+                os.write(input, 0, input.length);
+            }
+
+            // Check the response code and read the response
+            int responseCode = con.getResponseCode();
+            if(responseCode == HttpURLConnection.HTTP_OK) {
+                BufferedReader in = new BufferedReader(
+                        new InputStreamReader(con.getInputStream(), StandardCharsets.UTF_8));
+                StringBuilder response = new StringBuilder();
+                String line;
+                while ((line = in.readLine()) != null) {
+                    response.append(line);
+                }
+                in.close();
+
+                // Parse the JSON response using Jackson
+                ObjectMapper mapper = new ObjectMapper();
+                Map<String, Object> responseMap = mapper.readValue(response.toString(), Map.class);
+                String accessToken = (String) responseMap.get("access_token");
+
+                // Print the token. In Talend, assign it to context.client_token:
+                // context.client_token = accessToken;
+                System.out.println("Access Token: " + accessToken);
+            } else {
+                System.out.println("Error: " + responseCode + " - " + con.getResponseMessage());
+            }
+            con.disconnect();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+}
+
+
+
 /***************************************************************************************
  * This code snippet fetches an OAuth2 token from Okta using the client_credentials flow
  * and stores the access token in context.client_token.
