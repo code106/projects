@@ -14,7 +14,8 @@ while ($true) {
     [Mouse]::SetCursorPos($pos.X, $pos.Y)      # Moves it back
     Start-Sleep -Seconds 60
 }
-_----++++
+
+
 Add-Type -AssemblyName System.Windows.Forms
 
 while ($true) {
